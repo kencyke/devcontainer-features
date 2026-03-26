@@ -1,0 +1,18 @@
+{
+    "id": "claude-code",
+    "version": "1.0.0",
+    "name": "Claude Code",
+    "description": "Installs Claude Code CLI via the official native installer (https://claude.ai/install.sh)",
+    "documentationURL": "https://github.com/kencyke/devcontainer-features/tree/main/src/claude-code",
+    "keywords": ["claude", "claude-code", "ai", "coding-agent"],
+    "options": {
+        "version": {
+            "type": "string",
+            "default": "latest",
+            "description": "Version to install. 'latest', 'stable', or a specific version number (e.g. '1.0.58')."
+        }
+    },
+    "installsAfter": [
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}
