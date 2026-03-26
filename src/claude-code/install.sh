@@ -26,7 +26,8 @@ apt_install() {
 
     if [ -n "${package_list}" ]; then
         apt-get update
-        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${package_list}
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${package_list} && \
+            apt-get clean && rm -rf /var/lib/apt/lists/*
     fi
 }
 
