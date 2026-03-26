@@ -45,6 +45,10 @@ verify_binary_integrity() {
     verify_strict="${3:-false}"  # "true" for specific-version installs
 
     if [ -z "${verify_version}" ] || [ "${verify_version}" = "unknown" ]; then
+        if [ "${verify_strict}" = "true" ]; then
+            echo "ERROR: Unable to determine installed version for integrity check" >&2
+            return 1
+        fi
         echo "WARNING: Unable to determine installed version, skipping integrity check" >&2
         return 0
     fi
