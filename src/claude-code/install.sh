@@ -98,6 +98,7 @@ verify_binary_integrity() {
 echo "Installing Claude Code..."
 
 FEATURE_VERSION="${VERSION:-"latest"}"
+REQUIRE_INTEGRITY_CHECK="${REQUIREINTEGRITYCHECK:-"false"}"
 
 # Validate version format: 'latest', 'stable', or semver (e.g. 1.0.58)
 if [ "${FEATURE_VERSION}" != "latest" ] && [ "${FEATURE_VERSION}" != "stable" ]; then
@@ -163,8 +164,11 @@ CLAUDE_BIN="${REMOTE_USER_HOME}/.local/bin/claude"
 if [ -x "${CLAUDE_BIN}" ]; then
     # Verify binary integrity against release manifest
     # Hard-fail integrity check for pinned versions; soft-fail for channels
+    # Users can force strict checks for channels via requireIntegrityCheck
     STRICT_INTEGRITY="false"
     if [ "${FEATURE_VERSION}" != "latest" ] && [ "${FEATURE_VERSION}" != "stable" ]; then
+        STRICT_INTEGRITY="true"
+    elif [ "${REQUIRE_INTEGRITY_CHECK}" = "true" ]; then
         STRICT_INTEGRITY="true"
     fi
     if ! verify_binary_integrity "${CLAUDE_BIN}" "${INSTALLED_VERSION}" "${STRICT_INTEGRITY}"; then

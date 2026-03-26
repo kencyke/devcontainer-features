@@ -10,6 +10,7 @@ This feature uses the native installer recommended in the Claude Code setup docs
 | Option | Description | Type | Default |
 |--------|-------------|------|---------|
 | `version` | Version to install. `latest`, `stable`, or a specific version number (e.g. `1.0.58`). | `string` | `latest` |
+| `requireIntegrityCheck` | When `true`, fail the installation if binary integrity verification cannot be performed. By default, `latest`/`stable` installs only warn on verification failure. | `boolean` | `false` |
 
 ## Usage
 
