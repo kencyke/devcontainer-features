@@ -32,8 +32,9 @@ apt_install() {
 }
 
 get_installed_version() {
-    if su - "${REMOTE_USER}" -c 'command -v claude >/dev/null 2>&1'; then
-        su - "${REMOTE_USER}" -c 'claude --version' 2>/dev/null | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1
+    giv_claude_bin="${REMOTE_USER_HOME}/.local/bin/claude"
+    if [ -x "${giv_claude_bin}" ]; then
+        "${giv_claude_bin}" --version 2>/dev/null | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1
     fi
 }
 
@@ -206,7 +207,7 @@ if [ "${ALPINE:-}" = "true" ]; then
 fi
 
 # Verify installation
-if command -v claude > /dev/null 2>&1 || su - "${REMOTE_USER}" -c 'command -v claude > /dev/null 2>&1'; then
+if [ -x /usr/local/bin/claude ] || [ -x "${REMOTE_USER_HOME}/.local/bin/claude" ]; then
     echo "Claude Code ${INSTALLED_VERSION} installed successfully"
 else
     echo "ERROR: claude command not found after installation" >&2
