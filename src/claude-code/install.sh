@@ -1,5 +1,5 @@
-#!/bin/sh
-set -e
+#!/bin/bash
+set -eo pipefail
 
 get_installed_version() {
     giv_claude_bin="${REMOTE_USER_HOME}/.local/bin/claude"
@@ -141,10 +141,10 @@ fi
 if [ "${SKIP_INSTALL}" = "false" ]; then
 # Install Claude Code as the remote user (installer is user-local)
     if [ "${FEATURE_VERSION}" = "latest" ]; then
-        su - "${REMOTE_USER}" -c 'curl -fsSL https://claude.ai/install.sh | bash'
+        su -s /bin/bash - "${REMOTE_USER}" -c 'set -eo pipefail; curl -fsSL https://claude.ai/install.sh | bash'
     else
         # Safe: FEATURE_VERSION is validated above to only contain [0-9.], 'latest', or 'stable'
-        su - "${REMOTE_USER}" -c "curl -fsSL https://claude.ai/install.sh | bash -s -- '${FEATURE_VERSION}'"
+        su -s /bin/bash - "${REMOTE_USER}" -c "set -eo pipefail; curl -fsSL https://claude.ai/install.sh | bash -s -- '${FEATURE_VERSION}'"
     fi
     INSTALLED_VERSION="$(get_installed_version)"
 fi
