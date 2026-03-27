@@ -50,7 +50,7 @@ verify_binary_integrity() {
         return 0
     }
 
-    verify_expected_checksum="$(printf '%s' "${verify_manifest}" | grep -A2 "\"${verify_platform}\"" | grep '"checksum"' | sed 's/.*"checksum"[[:space:]]*:[[:space:]]*"\([a-f0-9]*\)".*/\1/')"
+    verify_expected_checksum="$(printf '%s' "${verify_manifest}" | grep -A2 "\"${verify_platform}\"" | grep '"checksum"' | sed 's/.*"checksum"[[:space:]]*:[[:space:]]*"\([a-f0-9]*\)".*/\1/')" || true
     if [ -z "${verify_expected_checksum}" ]; then
         if [ "${verify_strict}" = "true" ]; then
             echo "ERROR: No checksum found for platform ${verify_platform} in manifest (JSON format may have changed)" >&2
