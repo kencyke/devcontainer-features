@@ -104,6 +104,7 @@ echo "Installing Claude Code..."
 
 FEATURE_VERSION="${VERSION:-"latest"}"
 REQUIRE_INTEGRITY_CHECK="${REQUIREINTEGRITYCHECK:-"false"}"
+FORCE_REINSTALL="${FORCEREINSTALL:-"false"}"
 
 # Validate version format: 'latest', 'stable', or semver (e.g. 1.0.58)
 if [ "${FEATURE_VERSION}" != "latest" ] && [ "${FEATURE_VERSION}" != "stable" ]; then
@@ -167,9 +168,18 @@ if ! command -v curl > /dev/null 2>&1; then
 fi
 
 INSTALLED_VERSION="$(get_installed_version)"
-if [ -n "${INSTALLED_VERSION}" ] && [ "${FEATURE_VERSION}" = "${INSTALLED_VERSION}" ]; then
-    echo "Claude Code ${INSTALLED_VERSION} is already installed. Skipping installation."
-else
+SKIP_INSTALL="false"
+if [ "${FORCE_REINSTALL}" != "true" ] && [ -n "${INSTALLED_VERSION}" ]; then
+    if [ "${FEATURE_VERSION}" = "latest" ] || [ "${FEATURE_VERSION}" = "stable" ]; then
+        echo "Claude Code ${INSTALLED_VERSION} is already installed. Set forceReinstall to true to update. Skipping."
+        SKIP_INSTALL="true"
+    elif [ "${FEATURE_VERSION}" = "${INSTALLED_VERSION}" ]; then
+        echo "Claude Code ${INSTALLED_VERSION} is already installed. Skipping installation."
+        SKIP_INSTALL="true"
+    fi
+fi
+
+if [ "${SKIP_INSTALL}" = "false" ]; then
 # Install Claude Code as the remote user (installer is user-local)
     if [ "${FEATURE_VERSION}" = "latest" ]; then
         su - "${REMOTE_USER}" -c 'curl -fsSL https://claude.ai/install.sh | bash'

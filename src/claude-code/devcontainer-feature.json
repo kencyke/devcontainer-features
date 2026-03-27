@@ -15,6 +15,11 @@
             "type": "boolean",
             "default": false,
             "description": "When true, fail the installation if the binary integrity check cannot be performed (e.g. manifest download failure). By default, latest/stable installs only warn on verification failure."
+        },
+        "forceReinstall": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, always re-download and install Claude Code even if it is already present. Useful for ensuring the latest version when using channel installs (latest/stable)."
         }
     },
     "installsAfter": [
