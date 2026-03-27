@@ -118,6 +118,21 @@ REMOTE_USER="${_REMOTE_USER:-"automatic"}"
 if [ "${REMOTE_USER}" = "auto" ] || [ "${REMOTE_USER}" = "automatic" ]; then
     REMOTE_USER="$(id -un 1000 2>/dev/null || echo "vscode")"
 fi
+
+# Validate that the resolved user actually exists on the system.
+# On base images without a UID 1000 or "vscode" user, su would fail otherwise.
+if ! id "${REMOTE_USER}" >/dev/null 2>&1; then
+    echo "WARNING: User '${REMOTE_USER}' does not exist." >&2
+    if [ -n "${_CONTAINER_USER:-}" ] && id "${_CONTAINER_USER}" >/dev/null 2>&1; then
+        echo "WARNING: Falling back to _CONTAINER_USER '${_CONTAINER_USER}'." >&2
+        REMOTE_USER="${_CONTAINER_USER}"
+    else
+        echo "ERROR: No valid user found. Tried '${REMOTE_USER}'${_CONTAINER_USER:+ and '${_CONTAINER_USER}'}." >&2
+        echo "ERROR: Ensure the base image has a non-root user, or set remoteUser in devcontainer.json." >&2
+        exit 1
+    fi
+fi
+
 REMOTE_USER_HOME="${_REMOTE_USER_HOME:-"/home/${REMOTE_USER}"}"
 if [ "${REMOTE_USER}" = "root" ]; then
     REMOTE_USER_HOME="/root"
