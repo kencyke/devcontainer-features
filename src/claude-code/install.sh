@@ -44,6 +44,10 @@ verify_binary_integrity() {
         x86_64)  verify_arch="x64" ;;
         aarch64) verify_arch="arm64" ;;
         *)
+            if [ "${verify_strict}" = "true" ]; then
+                echo "ERROR: Unknown architecture $(uname -m), cannot perform integrity check" >&2
+                return 1
+            fi
             echo "WARNING: Unknown architecture $(uname -m), skipping integrity check" >&2
             return 0
             ;;
