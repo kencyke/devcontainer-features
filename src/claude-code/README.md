@@ -26,7 +26,7 @@ This feature uses the native installer recommended in the Claude Code setup docs
 - Claude Code requires a supported Claude account. Start `claude` after install and complete the browser login flow.
 - The channel you choose at install time (`latest` or `stable`) becomes the default for auto-updates. `stable` follows a delayed release schedule (typically about one week behind `latest`).
 - To disable background auto-updates inside the container, set `DISABLE_AUTOUPDATER` to `"1"` in your Claude Code `settings.json` under the `env` key.
-- On Alpine, this feature installs `libgcc`, `libstdc++`, and `ripgrep`, and exports `USE_BUILTIN_RIPGREP=0` for musl compatibility.
+- **Alpine Linux is not supported.** This feature targets Debian/Ubuntu-based images. For Alpine, see the [official manual setup](https://code.claude.com/docs/en/setup#alpine-linux-and-musl-based-distributions).
 
 ## Verify Installation
 

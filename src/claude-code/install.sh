@@ -1,20 +1,6 @@
 #!/bin/sh
 set -e
 
-apk_install() {
-    package_list=""
-    for package_name in "$@"; do
-        if ! apk info -e "${package_name}" >/dev/null 2>&1 || [ "${package_name}" = "ca-certificates" ]; then
-            package_list="${package_list} ${package_name}"
-        fi
-    done
-
-    if [ -n "${package_list}" ]; then
-        apk update
-        apk add --no-cache ${package_list}
-    fi
-}
-
 apt_install() {
     package_list=""
     for package_name in "$@"; do
@@ -64,9 +50,6 @@ verify_binary_integrity() {
     esac
 
     verify_platform="linux-${verify_arch}"
-    if [ "${ALPINE:-}" = "true" ]; then
-        verify_platform="${verify_platform}-musl"
-    fi
 
     verify_manifest_url="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/${verify_version}/manifest.json"
     verify_manifest="$(curl -fsSL "${verify_manifest_url}" 2>/dev/null)" || {
@@ -149,10 +132,6 @@ else
 fi
 
 case "${DISTRO}" in
-    alpine)
-        apk_install bash ca-certificates curl libgcc libstdc++ ripgrep
-        ALPINE=true
-        ;;
     debian | ubuntu)
         apt_install bash ca-certificates curl ripgrep
         ;;
@@ -210,25 +189,6 @@ if [ -x "${CLAUDE_BIN}" ]; then
 else
     echo "ERROR: Claude binary not found at ${CLAUDE_BIN} after installation." >&2
     exit 1
-fi
-
-# Add ~/.local/bin to PATH in profile files
-PATH_EXPORT='export PATH="$HOME/.local/bin:$PATH"'
-for profile_file in "${REMOTE_USER_HOME}/.profile" "${REMOTE_USER_HOME}/.bashrc" "${REMOTE_USER_HOME}/.zshrc"; do
-    if [ -f "${profile_file}" ] && ! grep -qF '.local/bin' "${profile_file}"; then
-        echo "${PATH_EXPORT}" >> "${profile_file}"
-    fi
-done
-chown "${REMOTE_USER}" "${REMOTE_USER_HOME}/.profile" "${REMOTE_USER_HOME}/.bashrc" "${REMOTE_USER_HOME}/.zshrc" 2>/dev/null || true
-
-# Alpine: disable built-in ripgrep (musl incompatible)
-if [ "${ALPINE:-}" = "true" ]; then
-    RG_EXPORT='export USE_BUILTIN_RIPGREP=0'
-    for profile_file in "${REMOTE_USER_HOME}/.profile" "${REMOTE_USER_HOME}/.bashrc" "${REMOTE_USER_HOME}/.zshrc"; do
-        if [ -f "${profile_file}" ] && ! grep -qF 'USE_BUILTIN_RIPGREP' "${profile_file}"; then
-            echo "${RG_EXPORT}" >> "${profile_file}"
-        fi
-    done
 fi
 
 # Verify installation
