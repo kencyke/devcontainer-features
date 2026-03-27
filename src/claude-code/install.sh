@@ -121,9 +121,20 @@ if ! id "${REMOTE_USER}" >/dev/null 2>&1; then
     fi
 fi
 
-REMOTE_USER_HOME="${_REMOTE_USER_HOME:-"/home/${REMOTE_USER}"}"
-if [ "${REMOTE_USER}" = "root" ]; then
+# Resolve the home directory for the final REMOTE_USER.
+# _REMOTE_USER_HOME corresponds to _REMOTE_USER, which may differ from
+# REMOTE_USER after the _CONTAINER_USER fallback above. Use _REMOTE_USER_HOME
+# only when REMOTE_USER still matches _REMOTE_USER; otherwise resolve it
+# from the system so version detection and installation target the correct path.
+if [ -n "${_REMOTE_USER_HOME:-}" ] && [ "${REMOTE_USER}" = "${_REMOTE_USER:-}" ]; then
+    REMOTE_USER_HOME="${_REMOTE_USER_HOME}"
+elif [ "${REMOTE_USER}" = "root" ]; then
     REMOTE_USER_HOME="/root"
+else
+    REMOTE_USER_HOME="$(getent passwd "${REMOTE_USER}" | cut -d: -f6 2>/dev/null)" || REMOTE_USER_HOME=""
+    if [ -z "${REMOTE_USER_HOME}" ]; then
+        REMOTE_USER_HOME="/home/${REMOTE_USER}"
+    fi
 fi
 
 # Install dependencies required by the Claude installer and CLI.
