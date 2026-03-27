@@ -1,22 +1,6 @@
 #!/bin/sh
 set -e
 
-apt_install() {
-    package_list=""
-    for package_name in "$@"; do
-        if ! dpkg-query -W -f='${Status}' "${package_name}" 2>/dev/null | grep -q "install ok installed" \
-            || [ "${package_name}" = "ca-certificates" ]; then
-            package_list="${package_list} ${package_name}"
-        fi
-    done
-
-    if [ -n "${package_list}" ]; then
-        apt-get update
-        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${package_list} && \
-            apt-get clean && rm -rf /var/lib/apt/lists/*
-    fi
-}
-
 get_installed_version() {
     giv_claude_bin="${REMOTE_USER_HOME}/.local/bin/claude"
     if [ -x "${giv_claude_bin}" ]; then
@@ -137,27 +121,8 @@ else
     fi
 fi
 
-# Install dependencies required by the Claude installer and CLI.
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    DISTRO="${ID}"
-else
-    echo "ERROR: Unable to detect Linux distribution." >&2
-    exit 1
-fi
-
-case "${DISTRO}" in
-    debian | ubuntu)
-        apt_install bash ca-certificates curl ripgrep
-        ;;
-    *)
-        echo "ERROR: Unsupported distribution '${DISTRO}'." >&2
-        exit 1
-        ;;
-esac
-
 if ! command -v curl > /dev/null 2>&1; then
-    echo "ERROR: curl is required but not found after dependency installation." >&2
+    echo "ERROR: curl is required but not found. Ensure the base image includes curl." >&2
     exit 1
 fi
 
