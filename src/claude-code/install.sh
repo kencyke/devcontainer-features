@@ -10,6 +10,7 @@ get_installed_version() {
 
 # Verify binary integrity using SHA256 checksum from release manifest.
 # See: https://code.claude.com/docs/en/setup#binary-integrity-and-code-signing
+# Returns: 0 = verified, 1 = checksum mismatch (untrusted), 2 = verification impossible
 verify_binary_integrity() {
     verify_claude_bin="$1"
     verify_version="$2"
@@ -18,7 +19,7 @@ verify_binary_integrity() {
     if [ -z "${verify_version}" ] || [ "${verify_version}" = "unknown" ]; then
         if [ "${verify_strict}" = "true" ]; then
             echo "ERROR: Unable to determine installed version for integrity check" >&2
-            return 1
+            return 2
         fi
         echo "WARNING: Unable to determine installed version, skipping integrity check" >&2
         return 0
@@ -30,7 +31,7 @@ verify_binary_integrity() {
         *)
             if [ "${verify_strict}" = "true" ]; then
                 echo "ERROR: Unknown architecture $(uname -m), cannot perform integrity check" >&2
-                return 1
+                return 2
             fi
             echo "WARNING: Unknown architecture $(uname -m), skipping integrity check" >&2
             return 0
@@ -43,7 +44,7 @@ verify_binary_integrity() {
     verify_manifest="$(curl -fsSL "${verify_manifest_url}" 2>/dev/null)" || {
         if [ "${verify_strict}" = "true" ]; then
             echo "ERROR: Could not download release manifest for v${verify_version}" >&2
-            return 1
+            return 2
         fi
         echo "WARNING: Could not download release manifest for v${verify_version}, skipping integrity check" >&2
         return 0
@@ -53,7 +54,7 @@ verify_binary_integrity() {
     if [ -z "${verify_expected_checksum}" ]; then
         if [ "${verify_strict}" = "true" ]; then
             echo "ERROR: No checksum found for platform ${verify_platform} in manifest (JSON format may have changed)" >&2
-            return 1
+            return 2
         fi
         echo "WARNING: No checksum found for platform ${verify_platform} in manifest (JSON format may have changed), skipping integrity check" >&2
         return 0
@@ -160,9 +161,23 @@ if [ -x "${CLAUDE_BIN}" ]; then
     elif [ "${REQUIRE_INTEGRITY_CHECK}" = "true" ]; then
         STRICT_INTEGRITY="true"
     fi
-    if ! verify_binary_integrity "${CLAUDE_BIN}" "${INSTALLED_VERSION}" "${STRICT_INTEGRITY}"; then
+    verify_binary_integrity "${CLAUDE_BIN}" "${INSTALLED_VERSION}" "${STRICT_INTEGRITY}" && verify_rc=0 || verify_rc=$?
+    if [ "${verify_rc}" -eq 1 ]; then
+        # Checksum mismatch — binary is untrusted, always remove
         rm -f "${CLAUDE_BIN}"
         echo "ERROR: Removed untrusted binary. Please retry installation." >&2
+        exit 1
+    elif [ "${verify_rc}" -eq 2 ]; then
+        # Verification could not be performed (network issue, unknown arch, etc.)
+        if [ "${SKIP_INSTALL}" = "false" ]; then
+            # Freshly installed binary — remove since we cannot verify it
+            rm -f "${CLAUDE_BIN}"
+            echo "ERROR: Removed unverified binary. Please retry installation." >&2
+        else
+            # Pre-existing binary — leave in place to avoid breaking a working install
+            echo "ERROR: Integrity verification failed but existing binary was preserved." >&2
+            echo "ERROR: Re-run with forceReinstall to re-download, or check network connectivity." >&2
+        fi
         exit 1
     fi
     ln -sf "${CLAUDE_BIN}" /usr/local/bin/claude
