@@ -1,0 +1,12 @@
+{
+	"id": "claude-bind-mount",
+	"version": "1.0.0",
+	"name": "Claude Bind Mount",
+	"description": "Stages the host ~/.claude directory inside the container and copies it into the container user's home only when ~/.claude does not already contain data.",
+	"documentationURL": "https://github.com/kencyke/devcontainer-features/tree/main/src/claude-bind-mount",
+	"keywords": ["claude", "claude-code", "mount", "bind-mount", "persistence"],
+	"mounts": [
+		"type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/var/tmp/claude-bind-mount/host-home/.claude,readonly"
+	],
+	"onCreateCommand": "/usr/local/share/claude-bind-mount/sync.sh"
+}
