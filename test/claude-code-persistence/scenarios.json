@@ -1,0 +1,68 @@
+{
+    "shared_volume": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence",
+                "target": "/mnt/claude-code-persistence",
+                "type": "volume"
+            }
+        ]
+    },
+    "non_root_user": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": {
+            "ghcr.io/devcontainers/features/common-utils:2": {
+                "installZsh": false,
+                "installOhMyZsh": false,
+                "upgradePackages": false,
+                "username": "octocat"
+            },
+            "claude-code-persistence": {}
+        },
+        "remoteUser": "octocat"
+    },
+    "with_claude_code": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": {
+            "claude-code": {},
+            "claude-code-persistence": {}
+        },
+        "remoteUser": "vscode"
+    },
+    "home_claude_is_mountpoint": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-home-${devcontainerId}",
+                "target": "/home/vscode/.claude",
+                "type": "volume"
+            }
+        ],
+        "remoteUser": "vscode"
+    },
+    "home_claude_contains_mount": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-commands-${devcontainerId}",
+                "target": "/home/vscode/.claude/commands",
+                "type": "volume"
+            }
+        ],
+        "remoteUser": "vscode"
+    }
+}
