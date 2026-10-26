@@ -1,5 +1,5 @@
 {
-    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "customizations": {
         "vscode": {
             "settings": {
@@ -18,8 +18,14 @@
         }
     },
     "features": {
-        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+        "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "24"
+        }
     },
-    "remoteUser": "node",
+    "remoteUser": "vscode",
+    // Ensure Node.js version is at least 24.22.1 that fixes severe security vulnerabilities.
+    // cf. https://nodejs.org/ja/blog/vulnerability/october-2026-security-releases
+    "onCreateCommand": "node -e \"const [a,b,c]=process.versions.node.split('.').map(Number); if (a!==24 || b<22 || (b===22 && c<1)) { console.error('Node '+process.version+' < 24.22.1'); process.exit(1) }\"",
     "updateContentCommand": "npm install -g @devcontainers/cli"
 }
