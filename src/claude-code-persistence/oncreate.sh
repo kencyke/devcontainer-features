@@ -110,7 +110,7 @@ elif [ -d "${HOME_CLAUDE}" ] && [ ! -L "${HOME_CLAUDE}" ]; then
     moved=""
     skipped=""
     for entry in "${HOME_CLAUDE}"/*; do
-        name="$(basename "${entry}")"
+        name="${entry##*/}"
         if [ -e "${VOLUME_DIR}/${name}" ] || [ -L "${VOLUME_DIR}/${name}" ]; then
             skipped="${skipped} $(printf '%q' "${name}")"
             continue
@@ -131,9 +131,11 @@ elif [ -d "${HOME_CLAUDE}" ] && [ ! -L "${HOME_CLAUDE}" ]; then
             warn "Discarding from ${HOME_CLAUDE} because ${VOLUME_DIR} already has entries with the same name:${skipped}"
         fi
         rm -rf "${HOME_CLAUDE}"
-        ln -sfn "${VOLUME_DIR}" "${HOME_CLAUDE}"
+    fi
+    if [ -e "${HOME_CLAUDE}" ]; then
+        warn "Failed to move ${HOME_CLAUDE} into ${VOLUME_DIR}. Leaving it in place."
     else
-        warn "Failed to move some entries from ${HOME_CLAUDE} into ${VOLUME_DIR}. Leaving ${HOME_CLAUDE} in place."
+        ln -sfn "${VOLUME_DIR}" "${HOME_CLAUDE}"
     fi
 elif [ -e "${HOME_CLAUDE}" ] && [ ! -L "${HOME_CLAUDE}" ]; then
     warn "${HOME_CLAUDE} exists but is not a directory. Leaving it untouched."
