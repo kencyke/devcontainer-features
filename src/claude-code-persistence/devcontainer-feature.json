@@ -1,0 +1,24 @@
+{
+    "id": "claude-code-persistence",
+    "version": "1.0.0",
+    "name": "Claude Code Persistence",
+    "description": "Persists Claude Code state (~/.claude and .claude.json: credentials, settings, sessions, history, plugins) across container rebuilds using a Docker named volume",
+    "documentationURL": "https://github.com/kencyke/devcontainer-features/tree/main/src/claude-code-persistence",
+    "keywords": ["claude", "claude-code", "persistence", "volume"],
+    "mounts": [
+        {
+            "source": "claude-code-persistence-${devcontainerId}",
+            "target": "/mnt/claude-code-persistence",
+            "type": "volume"
+        }
+    ],
+    "containerEnv": {
+        "CLAUDE_CONFIG_DIR": "/mnt/claude-code-persistence"
+    },
+    "onCreateCommand": "/usr/local/share/claude-code-persistence/oncreate.sh",
+    "installsAfter": [
+        "ghcr.io/kencyke/devcontainer-features/claude-code",
+        "ghcr.io/anthropics/devcontainer-features/claude-code",
+        "ghcr.io/devcontainers/features/common-utils"
+    ]
+}

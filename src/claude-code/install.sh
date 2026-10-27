@@ -2,28 +2,84 @@
 set -eo pipefail
 
 get_installed_version() {
-    giv_claude_bin="${REMOTE_USER_HOME}/.local/bin/claude"
-    if [ -x "${giv_claude_bin}" ]; then
-        "${giv_claude_bin}" --version 2>/dev/null | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1
+    [ -x "${CLAUDE_BIN}" ] || return 0
+    # Run as the remote user, as the upstream installer itself runs the
+    # downloaded binary: running it as root would grant it more than the
+    # installer ever does. Not a login shell, so a broken ~/.profile cannot
+    # make a working binary look unusable. The launcher has not been verified
+    # yet, so a timeout keeps one that blocks from hanging the build.
+    # A binary that exits non-zero counts as not installed, whatever it
+    # printed: an error message such as "requires glibc 2.28.0" must not
+    # pass for a version.
+    giv_output="$(timeout 30 su -s /bin/sh "${REMOTE_USER}" -c '"$0" --version' "${CLAUDE_BIN}" 2>/dev/null)" || return 0
+    # A line that starts with a semver wins, wherever it is in the output,
+    # so a notice printed first cannot hide the version. Otherwise the
+    # first semver anywhere is taken, so that output like
+    # "Claude Code 2.2.0" still parses if the format ever changes.
+    printf '%s\n' "${giv_output}" | awk '
+        match($0, /^[0-9]+\.[0-9]+\.[0-9]+/) { print substr($0, RSTART, RLENGTH); found = 1; exit }
+        any == "" && match($0, /[0-9]+\.[0-9]+\.[0-9]+/) { any = substr($0, RSTART, RLENGTH) }
+        END { if (!found && any != "") print any }
+    '
+}
+
+# Remove the claude launcher, the binary it points to if that is inside the
+# installer's versions directory, and the /usr/local/bin link if it points to
+# the launcher. Anything else they point to is left alone. The home directory
+# is cleaned up as the remote user, so a symlink planted there cannot make
+# root delete a file the user could not delete anyway. Returns 1 if anything
+# in the home directory could not be removed.
+remove_claude_bin() {
+    rcb_rc=0
+    su -s /bin/sh "${REMOTE_USER}" -c '
+        rc=0
+        target="$(readlink -f "$0" 2>/dev/null)" || target=""
+        # Canonicalized like target, so that a trailing slash or a symlink in
+        # REMOTE_USER_HOME does not prevent the match
+        versions_dir="$(readlink -f "$1" 2>/dev/null)" || versions_dir=""
+        if [ -n "${versions_dir}" ]; then
+            case "${target}" in
+                "${versions_dir}/"?*) rm -f "${target}" || rc=1 ;;
+            esac
+        fi
+        rm -f "$0" || rc=1
+        exit "${rc}"
+    ' "${CLAUDE_BIN}" "${REMOTE_USER_HOME}/.local/share/claude/versions" || {
+        echo "WARNING: Could not remove ${CLAUDE_BIN} or its binary as ${REMOTE_USER}" >&2
+        rcb_rc=1
+    }
+    # Canonicalized on both sides, so a link written with a differently
+    # spelled path (a trailing slash in the home directory, say) is still
+    # recognized. readlink -f resolves the parent directories even after the
+    # launcher itself has been removed.
+    rcb_link_target="$(readlink -f /usr/local/bin/claude 2>/dev/null)" || rcb_link_target=""
+    rcb_bin_target="$(readlink -f "${CLAUDE_BIN}" 2>/dev/null)" || rcb_bin_target=""
+    if [ -L /usr/local/bin/claude ] && [ -n "${rcb_bin_target}" ] && [ "${rcb_link_target}" = "${rcb_bin_target}" ]; then
+        rm -f /usr/local/bin/claude
+    fi
+    return "${rcb_rc}"
+}
+
+# Removes the launcher after a failed check and says whether that worked.
+# The caller prints the reason first and exits afterwards.
+discard_claude_bin() {
+    if remove_claude_bin; then
+        echo "ERROR: Removed ${CLAUDE_BIN}. Please retry installation." >&2
+    else
+        echo "ERROR: ${CLAUDE_BIN} could not be fully removed. Do not use it." >&2
     fi
 }
 
 # Verify binary integrity using SHA256 checksum from release manifest.
 # See: https://code.claude.com/docs/en/setup#binary-integrity-and-code-signing
-# Returns: 0 = verified, 1 = checksum mismatch (untrusted), 2 = verification impossible
+# Returns: 0 = verified (or skipped when not strict), 1 = checksum mismatch
+# (untrusted), 2 = verification impossible
+# The version is never empty: callers exit before this when the binary
+# could not report one.
 verify_binary_integrity() {
     verify_claude_bin="$1"
     verify_version="$2"
     verify_strict="${3:-false}"  # "true" for specific-version installs
-
-    if [ -z "${verify_version}" ] || [ "${verify_version}" = "unknown" ]; then
-        if [ "${verify_strict}" = "true" ]; then
-            echo "ERROR: Unable to determine installed version for integrity check" >&2
-            return 2
-        fi
-        echo "WARNING: Unable to determine installed version, skipping integrity check" >&2
-        return 0
-    fi
 
     case "$(uname -m)" in
         x86_64)  verify_arch="x64" ;;
@@ -80,7 +136,9 @@ FORCE_REINSTALL="${FORCEREINSTALL:-"false"}"
 
 # Validate version format: 'latest', 'stable', or semver (e.g. 1.0.58)
 if [ "${FEATURE_VERSION}" != "latest" ] && [ "${FEATURE_VERSION}" != "stable" ]; then
-    if ! echo "${FEATURE_VERSION}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    # [[ =~ ]] matches the whole value; grep would accept a multi-line value
+    # if any one of its lines matched
+    if [[ ! "${FEATURE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "ERROR: Invalid version '${FEATURE_VERSION}'. Must be 'latest', 'stable', or a semver (e.g. '1.0.58')." >&2
         exit 1
     fi
@@ -106,24 +164,20 @@ if ! id "${REMOTE_USER}" >/dev/null 2>&1; then
     fi
 fi
 
-# Resolve the home directory for the final REMOTE_USER.
-# _REMOTE_USER_HOME corresponds to _REMOTE_USER, which may differ from
-# REMOTE_USER after the _CONTAINER_USER fallback above. Use _REMOTE_USER_HOME
-# only when REMOTE_USER still matches _REMOTE_USER; otherwise resolve it
-# from the system so version detection and installation target the correct path.
-if [ -n "${_REMOTE_USER_HOME:-}" ] && [ "${REMOTE_USER}" = "${_REMOTE_USER:-}" ]; then
-    REMOTE_USER_HOME="${_REMOTE_USER_HOME}"
-elif [ "${REMOTE_USER}" = "root" ]; then
-    REMOTE_USER_HOME="/root"
-else
-    REMOTE_USER_HOME="$(getent passwd "${REMOTE_USER}" | cut -d: -f6 2>/dev/null)" || REMOTE_USER_HOME=""
-    if [ -z "${REMOTE_USER_HOME}" ]; then
-        REMOTE_USER_HOME="/home/${REMOTE_USER}"
-    fi
-fi
+REMOTE_USER_HOME="$(getent passwd "${REMOTE_USER}" | cut -d: -f6)"
+CLAUDE_BIN="${REMOTE_USER_HOME}/.local/bin/claude"
 
 if ! command -v curl > /dev/null 2>&1; then
     echo "ERROR: curl is required but not found. Ensure the base image includes curl." >&2
+    exit 1
+fi
+
+# Everything below runs commands as the remote user through su. If that does
+# not work at all (/etc/nologin, an expired account, a PAM problem), a working
+# launcher would look broken and be removed, and the installer would fail
+# right after. Fail here instead, before anything is touched.
+if ! su -s /bin/sh "${REMOTE_USER}" -c 'true' >/dev/null 2>&1; then
+    echo "ERROR: Cannot run commands as '${REMOTE_USER}' with su. Nothing was changed." >&2
     exit 1
 fi
 
@@ -140,39 +194,64 @@ if [ "${FORCE_REINSTALL}" != "true" ] && [ -n "${INSTALLED_VERSION}" ]; then
 fi
 
 if [ "${SKIP_INSTALL}" = "false" ]; then
-# Install Claude Code as the remote user (installer is user-local)
+    # A launcher that exists but cannot report a version is broken. The
+    # installer leaves such a file in place, so remove it first.
+    if { [ -e "${CLAUDE_BIN}" ] || [ -L "${CLAUDE_BIN}" ]; } && [ -z "${INSTALLED_VERSION}" ]; then
+        echo "WARNING: Removing unusable ${CLAUDE_BIN} before installing" >&2
+        # On failure the installer may still replace it; the checks after
+        # the installation catch a launcher that is still broken
+        remove_claude_bin || true
+    fi
+    # Install Claude Code as the remote user (installer is user-local)
     if [ "${FEATURE_VERSION}" = "latest" ]; then
         su -s /bin/bash - "${REMOTE_USER}" -c 'set -eo pipefail; curl -fsSL https://claude.ai/install.sh | bash'
     else
-        # Safe: FEATURE_VERSION is validated above to only contain [0-9.], 'latest', or 'stable'
+        # Safe: FEATURE_VERSION is validated above to be exactly 'stable' or a
+        # single-line semver, so it cannot contain quotes or newlines
         su -s /bin/bash - "${REMOTE_USER}" -c "set -eo pipefail; curl -fsSL https://claude.ai/install.sh | bash -s -- '${FEATURE_VERSION}'"
     fi
     INSTALLED_VERSION="$(get_installed_version)"
+    # A freshly installed launcher that cannot report a version does not
+    # work, whether it is a binary that fails, a dangling link or a file that
+    # is not executable, and it cannot be checked against a release manifest
+    # either. Remove it so the next build does not start from a broken one.
+    if { [ -e "${CLAUDE_BIN}" ] || [ -L "${CLAUDE_BIN}" ]; } && [ -z "${INSTALLED_VERSION}" ]; then
+        echo "ERROR: The installed Claude Code launcher at ${CLAUDE_BIN} could not report its version. Check that Claude Code runs on this platform ($(uname -m))." >&2
+        discard_claude_bin
+        exit 1
+    fi
 fi
 
-CLAUDE_BIN="${REMOTE_USER_HOME}/.local/bin/claude"
 if [ -x "${CLAUDE_BIN}" ]; then
     # Verify binary integrity against release manifest
-    # Hard-fail integrity check for pinned versions; soft-fail for channels
-    # Users can force strict checks for channels via requireIntegrityCheck
+    # A checksum mismatch always fails. When the check cannot be performed,
+    # pinned versions and requireIntegrityCheck fail; channels only warn.
     STRICT_INTEGRITY="false"
     if [ "${FEATURE_VERSION}" != "latest" ] && [ "${FEATURE_VERSION}" != "stable" ]; then
         STRICT_INTEGRITY="true"
+        # A pinned install must yield exactly the requested version; the
+        # checksum below only proves the binary matches what it claims to be
+        if [ "${FEATURE_VERSION}" != "${INSTALLED_VERSION}" ]; then
+            echo "ERROR: Requested Claude Code ${FEATURE_VERSION}, but the installed binary reports ${INSTALLED_VERSION}." >&2
+            echo "ERROR: Check that version ${FEATURE_VERSION} exists, or choose another version." >&2
+            discard_claude_bin
+            exit 1
+        fi
     elif [ "${REQUIRE_INTEGRITY_CHECK}" = "true" ]; then
         STRICT_INTEGRITY="true"
     fi
     verify_binary_integrity "${CLAUDE_BIN}" "${INSTALLED_VERSION}" "${STRICT_INTEGRITY}" && verify_rc=0 || verify_rc=$?
     if [ "${verify_rc}" -eq 1 ]; then
         # Checksum mismatch — binary is untrusted, always remove
-        rm -f "${CLAUDE_BIN}"
-        echo "ERROR: Removed untrusted binary. Please retry installation." >&2
+        echo "ERROR: The binary is untrusted." >&2
+        discard_claude_bin
         exit 1
     elif [ "${verify_rc}" -eq 2 ]; then
         # Verification could not be performed (network issue, unknown arch, etc.)
         if [ "${SKIP_INSTALL}" = "false" ]; then
             # Freshly installed binary — remove since we cannot verify it
-            rm -f "${CLAUDE_BIN}"
-            echo "ERROR: Removed unverified binary. Please retry installation." >&2
+            echo "ERROR: The freshly installed binary could not be verified." >&2
+            discard_claude_bin
         else
             # Pre-existing binary — leave in place to avoid breaking a working install
             echo "ERROR: Integrity verification failed but existing binary was preserved." >&2
@@ -180,16 +259,10 @@ if [ -x "${CLAUDE_BIN}" ]; then
         fi
         exit 1
     fi
-    ln -sf "${CLAUDE_BIN}" /usr/local/bin/claude
+    ln -sfn "${CLAUDE_BIN}" /usr/local/bin/claude
 else
     echo "ERROR: Claude binary not found at ${CLAUDE_BIN} after installation." >&2
     exit 1
 fi
 
-# Verify installation
-if [ -x /usr/local/bin/claude ] || [ -x "${REMOTE_USER_HOME}/.local/bin/claude" ]; then
-    echo "Claude Code ${INSTALLED_VERSION} installed successfully"
-else
-    echo "ERROR: claude command not found after installation" >&2
-    exit 1
-fi
+echo "Claude Code ${INSTALLED_VERSION} installed successfully"

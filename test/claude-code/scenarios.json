@@ -1,0 +1,29 @@
+{
+    "dangling_launcher": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "features": {
+            "claude-code": {}
+        },
+        "remoteUser": "vscode"
+    },
+    "broken_launcher": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "features": {
+            "claude-code": {}
+        },
+        "remoteUser": "vscode"
+    },
+    "pinned_version": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": {
+            "claude-code": {
+                "version": "2.1.308"
+            }
+        },
+        "remoteUser": "vscode"
+    }
+}

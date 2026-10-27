@@ -1,0 +1,106 @@
+{
+    "shared_volume": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-shared",
+                "target": "/mnt/claude-code-persistence",
+                "type": "volume"
+            }
+        ]
+    },
+    "shared_volume_other_uid": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "updateRemoteUserUID": false,
+        "initializeCommand": [
+            "docker", "run", "--rm", "-u", "0",
+            "-v", "claude-code-persistence-test-shared:/v",
+            "mcr.microsoft.com/devcontainers/base:ubuntu",
+            "sh", "-c",
+            "rm -rf /v/.persistence-test-dir /v/.persistence-test-link && mkdir /v/.persistence-test-dir && echo ok > /v/.persistence-test-dir/marker && ln -s /etc/debian_version /v/.persistence-test-link && chown -R -h 1000:1000 /v"
+        ],
+        "features": {
+            "ghcr.io/devcontainers/features/common-utils:2": {
+                "installZsh": false,
+                "installOhMyZsh": false,
+                "upgradePackages": false,
+                "username": "octocat"
+            },
+            "claude-code-persistence": {}
+        },
+        "remoteUser": "octocat",
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-shared",
+                "target": "/mnt/claude-code-persistence",
+                "type": "volume"
+            }
+        ]
+    },
+    "with_claude_code": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": {
+            "claude-code": {},
+            "claude-code-persistence": {}
+        },
+        "remoteUser": "vscode"
+    },
+    "home_claude_is_mountpoint": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-home-${devcontainerId}",
+                "target": "/home/vscode/.claude",
+                "type": "volume"
+            }
+        ],
+        "remoteUser": "vscode"
+    },
+    "home_claude_contains_mount": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-commands-${devcontainerId}",
+                "target": "/home/vscode/.claude/commands",
+                "type": "volume"
+            }
+        ],
+        "remoteUser": "vscode"
+    },
+    "migration": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "initializeCommand": [
+            "docker", "run", "--rm", "-u", "0",
+            "-v", "claude-code-persistence-test-migration:/v",
+            "mcr.microsoft.com/devcontainers/base:ubuntu",
+            "sh", "-c",
+            "rm -rf /v/* /v/.[!.]* && echo volume > /v/settings.json && chown -R 1000:1000 /v"
+        ],
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-migration",
+                "target": "/mnt/claude-code-persistence",
+                "type": "volume"
+            }
+        ],
+        "remoteUser": "vscode"
+    }
+}
