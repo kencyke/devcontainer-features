@@ -12,7 +12,7 @@ CLAUDE_CONFIG_DIR=/mnt/claude-code-persistence
 ```
 
 - `CLAUDE_CONFIG_DIR` makes Claude Code keep `.claude.json` inside the volume as well. The `~/.claude` and `~/.claude.json` symlinks are only for tools that hard-code those paths.
-- When the container is created, anything already in `~/.claude` or `~/.claude.json` (for example written by an installer during the image build) is moved into the volume. An entry whose name already exists in the volume is not moved; it is discarded with a warning, and the copy in the volume wins. This includes `settings.json`, so settings that must always apply belong in managed settings, not in the image's `~/.claude`.
+- When the container is created, anything already in `~/.claude` or `~/.claude.json` (for example written by an installer during the image build) is moved into the volume, and the moved entries are listed in the creation log. An entry whose name already exists in the volume is not moved; it is discarded with a warning, and the copy in the volume wins. This includes `settings.json`, so settings that must always apply belong in managed settings, not in the image's `~/.claude`.
 - Nothing on the host is mounted or modified, and nothing is written to the workspace. If `~/.claude` or `~/.claude.json` is itself a mount, or `~/.claude` contains a mount (for example the host's directory bind-mounted by your own configuration), the feature leaves it untouched and prints a warning.
 - Do not set `CLAUDE_CONFIG_DIR` yourself in `devcontainer.json`. If it is overridden, the feature skips its setup.
 
@@ -35,7 +35,7 @@ When a Feature and `devcontainer.json` mount to the same target, the mount from 
 All dev containers that mount the same volume share everything in it:
 
 - They form a single trust boundary. Code running in any of them (the project's dependencies, its image, or Claude Code acting on a prompt injection) can read every project's transcripts and credentials, and can change the settings, hooks, MCP servers and plugins that the other containers then run. Anything a project's image puts in `~/.claude` is also moved into the shared volume. Share a volume only among projects you trust equally.
-- Per-project state (`projects/` transcripts and auto-memory, and the trust decisions in `.claude.json`) is keyed by the path inside the container, not by the repository. Two projects that use the same `workspaceFolder` (for example both at `/workspace`) see each other's sessions, and a repository you have never opened inherits the trust you granted to another one at the same path, so its hooks and project settings run without the trust prompt. Distinct `workspaceFolder`s avoid this, but they do not hide the files from the other containers.
+- Per-project state (`projects/` transcripts and auto-memory, and the trust decisions in `.claude.json`) is keyed by the path inside the container, not by the repository. Two projects that use the same `workspaceFolder` see each other's sessions, and a repository you have never opened inherits the trust you granted to another one at the same path, so its hooks and project settings run without the trust prompt. The default `workspaceFolder` is `/workspaces/` followed by the name of the project folder on the host, so this applies to any two repositories cloned into folders with the same name, not only to projects that both set something like `/workspace`. Distinct `workspaceFolder`s avoid this, but they do not hide the files from the other containers.
 - Dev containers running at the same time also share per-process state such as `sessions/` and `ide/`. If that causes problems, do not share the volume.
 - If the containers run as different UIDs, each one takes ownership of the shared volume when it is created, which locks out containers that are still running as the previous UID.
 
@@ -68,4 +68,4 @@ Remove a shared volume by the name you gave it, for example `docker volume rm cl
 
 ## Running the tests locally
 
-The `shared_volume` scenario of `devcontainer features test` mounts your real `claude-code-persistence` volume, fixes its ownership if needed and writes a temporary marker file into it. The other tests leave behind `claude-code-persistence-*` test volumes that you need to remove yourself.
+`devcontainer features test` leaves behind `claude-code-persistence-*` test volumes that you need to remove yourself. The `shared_volume` and `shared_volume_other_uid` scenarios use their own `claude-code-persistence-test-shared` volume. Before its container is created, `shared_volume_other_uid` fills that volume from the host with files owned by UID 1000, so that it always has their ownership to take over. Neither touches a shared volume you use yourself.

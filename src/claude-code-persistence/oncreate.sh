@@ -11,10 +11,26 @@ warn() {
     echo "claude-code-persistence: WARNING: $*" >&2
 }
 
+# Awk prelude for reading /proc/self/mountinfo: sets p to the path in
+# MOUNT_PATH and m to each line's mount point, decoding the octal escapes the
+# kernel writes for space, tab, newline and backslash. The path is passed
+# through the environment because awk -v would interpret its backslashes.
+MOUNTINFO_AWK='
+    function unescape(s,   out, i) {
+        out = ""
+        while ((i = index(s, "\\")) > 0) {
+            out = out substr(s, 1, i - 1) sprintf("%c", substr(s, i + 1, 1) * 64 + substr(s, i + 2, 1) * 8 + substr(s, i + 3, 1))
+            s = substr(s, i + 4)
+        }
+        return out s
+    }
+    BEGIN { p = ENVIRON["MOUNT_PATH"] }
+    { m = unescape($5) }
+'
+
 # Prints the mount point that contains the given path.
 covering_mount() {
-    awk -v p="$1" '
-        { m = $5; gsub(/\\040/, " ", m) }
+    MOUNT_PATH="$1" awk "${MOUNTINFO_AWK}"'
         m == "/" || p == m || index(p, m "/") == 1 { if (length(m) > length(best)) best = m }
         END { print best }
     ' /proc/self/mountinfo
@@ -22,8 +38,7 @@ covering_mount() {
 
 # Prints the mount points strictly below the given path, one per line.
 nested_mounts() {
-    awk -v p="$1" '
-        { m = $5; gsub(/\\040/, " ", m) }
+    MOUNT_PATH="$1" awk "${MOUNTINFO_AWK}"'
         index(m, p "/") == 1 { print m }
     ' /proc/self/mountinfo
 }
@@ -57,10 +72,12 @@ if [ "$(stat -c '%u:%g' "${VOLUME_DIR}")" != "${TARGET_UID}:${TARGET_GID}" ]; th
     elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
         AS_ROOT="sudo -n"
     else
-        warn "${VOLUME_DIR} is owned by $(stat -c '%u:%g' "${VOLUME_DIR}"), not by $(id -un) (${TARGET_UID}:${TARGET_GID}), and passwordless sudo is unavailable. Claude Code will not be able to read or write its state until you run: sudo chown -R ${TARGET_UID}:${TARGET_GID} ${VOLUME_DIR}"
+        warn "${VOLUME_DIR} is owned by $(stat -c '%u:%g' "${VOLUME_DIR}"), not by $(id -un) (${TARGET_UID}:${TARGET_GID}), and passwordless sudo is unavailable. Claude Code will not be able to read or write its state until you run: sudo chown -R -h ${TARGET_UID}:${TARGET_GID} ${VOLUME_DIR}"
         exit 0
     fi
-    if ! ${AS_ROOT} chown -R "${TARGET_UID}:${TARGET_GID}" "${VOLUME_DIR}"; then
+    # -h: change symlinks in the volume themselves, never the files they point
+    # to, regardless of the chown implementation (GNU or uutils)
+    if ! ${AS_ROOT} chown -R -h "${TARGET_UID}:${TARGET_GID}" "${VOLUME_DIR}"; then
         warn "Failed to change the owner of ${VOLUME_DIR}. Claude Code will not be able to read or write its state."
         exit 0
     fi
@@ -87,17 +104,25 @@ elif [ -n "${NESTED}" ]; then
     warn "${HOME_CLAUDE} contains other mounts ($(echo "${NESTED}" | tr '\n' ' ' | sed 's/ $//')). Leaving it untouched; Claude Code uses ${VOLUME_DIR}."
 elif [ -d "${HOME_CLAUDE}" ] && [ ! -L "${HOME_CLAUDE}" ]; then
     migrated="true"
+    moved=""
     skipped=""
     for entry in "${HOME_CLAUDE}"/*; do
         name="$(basename "${entry}")"
         if [ -e "${VOLUME_DIR}/${name}" ] || [ -L "${VOLUME_DIR}/${name}" ]; then
-            skipped="${skipped} ${name}"
+            skipped="${skipped} $(printf '%q' "${name}")"
             continue
         fi
-        if ! mv "${entry}" "${VOLUME_DIR}/${name}"; then
+        if mv "${entry}" "${VOLUME_DIR}/${name}"; then
+            moved="${moved} $(printf '%q' "${name}")"
+        else
             migrated="false"
         fi
     done
+    # Listed so that settings or hooks an image brings into a shared volume
+    # do not go unnoticed
+    if [ -n "${moved}" ]; then
+        echo "claude-code-persistence: Moved from ${HOME_CLAUDE} into ${VOLUME_DIR}:${moved}"
+    fi
     if [ "${migrated}" = "true" ]; then
         if [ -n "${skipped}" ]; then
             warn "Discarding from ${HOME_CLAUDE} because ${VOLUME_DIR} already has entries with the same name:${skipped}"
@@ -121,10 +146,12 @@ HOME_JSON="${HOME}/.claude.json"
 if ! on_root_filesystem "${HOME_JSON}"; then
     warn "${HOME_JSON} is on a separate mount ($(covering_mount "${HOME_JSON}")). Leaving it untouched; Claude Code uses ${VOLUME_DIR}/.claude.json."
 elif [ -f "${HOME_JSON}" ] && [ ! -L "${HOME_JSON}" ]; then
-    if [ -e "${VOLUME_DIR}/.claude.json" ]; then
+    if [ -e "${VOLUME_DIR}/.claude.json" ] || [ -L "${VOLUME_DIR}/.claude.json" ]; then
         warn "Discarding ${HOME_JSON} because ${VOLUME_DIR}/.claude.json already exists."
         rm -f "${HOME_JSON}"
-    elif ! mv "${HOME_JSON}" "${VOLUME_DIR}/.claude.json"; then
+    elif mv "${HOME_JSON}" "${VOLUME_DIR}/.claude.json"; then
+        echo "claude-code-persistence: Moved ${HOME_JSON} to ${VOLUME_DIR}/.claude.json"
+    else
         warn "Failed to move ${HOME_JSON} into ${VOLUME_DIR}. Leaving it in place."
     fi
     [ -e "${HOME_JSON}" ] || ln -sfn "${VOLUME_DIR}/.claude.json" "${HOME_JSON}"
