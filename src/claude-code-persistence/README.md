@@ -1,3 +1,4 @@
+
 # Claude Code Persistence (claude-code-persistence)
 
 Persists Claude Code state (~/.claude and .claude.json: credentials, settings, sessions, history, plugins) across container rebuilds using a Docker named volume
@@ -9,6 +10,8 @@ Persists Claude Code state (~/.claude and .claude.json: credentials, settings, s
     "ghcr.io/kencyke/devcontainer-features/claude-code-persistence:1": {}
 }
 ```
+
+
 
 ## How it works
 
