@@ -80,7 +80,7 @@ Remove a shared volume by the name you gave it, for example `docker volume rm cl
 
 ## Running the tests locally
 
-`devcontainer features test` leaves behind `claude-code-persistence-*` test volumes that you need to remove yourself. The `shared_volume` and `shared_volume_other_uid` scenarios use their own `claude-code-persistence-test-shared` volume. Before its container is created, `shared_volume_other_uid` fills that volume from the host with files owned by UID 1000, so that it always has their ownership to take over. Neither touches a shared volume you use yourself.
+`devcontainer features test` leaves behind `claude-code-persistence-*` test volumes that you need to remove yourself. The `shared_volume` and `shared_volume_other_uid` scenarios use their own `claude-code-persistence-test-shared` volume. Before its container is created, `shared_volume_other_uid` fills that volume from the host with files owned by UID 1000, so that it always has their ownership to take over. `migration` prefills its own `claude-code-persistence-test-migration` volume the same way. None of them touches a shared volume you use yourself.
 
 
 ---

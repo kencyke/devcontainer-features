@@ -93,5 +93,28 @@
             }
         ],
         "remoteUser": "vscode"
+    },
+    "migration": {
+        "build": {
+            "dockerfile": "Dockerfile"
+        },
+        "initializeCommand": [
+            "docker", "run", "--rm", "-u", "0",
+            "-v", "claude-code-persistence-test-migration:/v",
+            "mcr.microsoft.com/devcontainers/base:ubuntu",
+            "sh", "-c",
+            "rm -rf /v/* /v/.[!.]* && echo volume > /v/settings.json && chown -R 1000:1000 /v"
+        ],
+        "features": {
+            "claude-code-persistence": {}
+        },
+        "mounts": [
+            {
+                "source": "claude-code-persistence-test-migration",
+                "target": "/mnt/claude-code-persistence",
+                "type": "volume"
+            }
+        ],
+        "remoteUser": "vscode"
     }
 }
