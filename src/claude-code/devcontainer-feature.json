@@ -1,6 +1,6 @@
 {
     "id": "claude-code",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "name": "Claude Code",
     "description": "Installs Claude Code CLI via the official native installer (https://claude.ai/install.sh)",
     "documentationURL": "https://github.com/kencyke/devcontainer-features/tree/main/src/claude-code",
