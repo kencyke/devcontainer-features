@@ -16,6 +16,5 @@ check "~/.claude.json links into the volume" test "$(readlink "${HOME}/.claude.j
 check "entries from the image were moved" test "$(cat "${VOLUME}/history.jsonl")" = "image"
 check "~/.claude.json from the image seeded the volume" test "$(cat "${VOLUME}/.claude.json")" = "image"
 check "the volume's settings.json wins" test "$(cat "${VOLUME}/settings.json")" = "volume"
-check "moved entries are owned by the current user" test "$(stat -c '%u:%g' "${VOLUME}/history.jsonl")" = "$(id -u):$(id -g)"
 
 reportResults

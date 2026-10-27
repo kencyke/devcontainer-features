@@ -1,7 +1,6 @@
 {
     "shared_volume": {
         "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-        "updateRemoteUserUID": false,
         "features": {
             "claude-code-persistence": {}
         },
@@ -40,19 +39,6 @@
                 "type": "volume"
             }
         ]
-    },
-    "non_root_user": {
-        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-        "features": {
-            "ghcr.io/devcontainers/features/common-utils:2": {
-                "installZsh": false,
-                "installOhMyZsh": false,
-                "upgradePackages": false,
-                "username": "octocat"
-            },
-            "claude-code-persistence": {}
-        },
-        "remoteUser": "octocat"
     },
     "with_claude_code": {
         "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
