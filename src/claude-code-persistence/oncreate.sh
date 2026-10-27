@@ -55,8 +55,11 @@ if [ "${CLAUDE_CONFIG_DIR:-}" != "${VOLUME_DIR}" ]; then
     exit 0
 fi
 
-if [ ! -d "${VOLUME_DIR}" ] || [ -L "${VOLUME_DIR}" ]; then
-    warn "${VOLUME_DIR} is not a directory. Skipping setup."
+# Without the mount, nothing would persist. With a mount below it, the chown
+# and the move further down could reach files outside the volume (e.g. a host
+# directory the user bind-mounted there).
+if [ ! -d "${VOLUME_DIR}" ] || [ "$(covering_mount "${VOLUME_DIR}")" != "${VOLUME_DIR}" ] || [ -n "$(nested_mounts "${VOLUME_DIR}")" ]; then
+    warn "${VOLUME_DIR} is not a mount point, or contains other mounts. Skipping setup."
     exit 0
 fi
 

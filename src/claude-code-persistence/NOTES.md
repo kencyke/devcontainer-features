@@ -13,8 +13,8 @@ CLAUDE_CONFIG_DIR=/mnt/claude-code-persistence
 
 - `CLAUDE_CONFIG_DIR` makes Claude Code keep `.claude.json` inside the volume as well. The `~/.claude` and `~/.claude.json` symlinks are only for tools that hard-code those paths.
 - When the container is created, anything already in `~/.claude` or `~/.claude.json` (for example written by an installer during the image build) is moved into the volume, and the moved entries are listed in the creation log. An entry whose name already exists in the volume is not moved; it is discarded with a warning, and the copy in the volume wins. This includes `settings.json`, so settings that must always apply belong in managed settings, not in the image's `~/.claude`.
-- Nothing on the host is mounted or modified, and nothing is written to the workspace. If `~/.claude` or `~/.claude.json` is itself a mount, or `~/.claude` contains a mount (for example the host's directory bind-mounted by your own configuration), the feature leaves it untouched and prints a warning.
-- Do not set `CLAUDE_CONFIG_DIR` yourself in `devcontainer.json`. If it is overridden, the feature skips its setup.
+- Nothing on the host is mounted or modified, and nothing is written to the workspace. If `~/.claude` or `~/.claude.json` is on a separate mount (for example the host's directory, or your whole home directory, bind-mounted by your own configuration), or `~/.claude` contains a mount, the feature leaves it untouched and prints a warning.
+- Do not set `CLAUDE_CONFIG_DIR` yourself in `devcontainer.json`, and do not mount anything below `/mnt/claude-code-persistence`. If either is done, or the volume is not mounted, the feature skips its setup with a warning.
 
 ## Sharing one volume across projects
 
