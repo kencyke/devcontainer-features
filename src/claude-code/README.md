@@ -16,7 +16,7 @@ Installs Claude Code CLI via the official native installer (https://claude.ai/in
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
 | version | Version to install. 'latest', 'stable', or a specific version number (e.g. '1.0.58'). | string | latest |
-| requireIntegrityCheck | When true, fail the installation if the binary integrity check cannot be performed (e.g. manifest download failure). By default, latest/stable installs only warn on verification failure. | boolean | false |
+| requireIntegrityCheck | When true, fail the installation if the binary integrity check cannot be performed (e.g. manifest download failure). By default, latest/stable installs only warn when the integrity check cannot be performed. | boolean | false |
 | forceReinstall | When true, always re-download and install Claude Code even if it is already present. Useful for ensuring the latest version when using channel installs (latest/stable). | boolean | false |
 
 

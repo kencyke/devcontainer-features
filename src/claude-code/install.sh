@@ -72,21 +72,14 @@ discard_claude_bin() {
 
 # Verify binary integrity using SHA256 checksum from release manifest.
 # See: https://code.claude.com/docs/en/setup#binary-integrity-and-code-signing
-# Returns: 0 = verified, 1 = checksum mismatch (untrusted), 2 = verification impossible
-# The version is always one the binary reported: callers exit before this
-# when it could not report one.
+# Returns: 0 = verified (or skipped when not strict), 1 = checksum mismatch
+# (untrusted), 2 = verification impossible
+# The version is never empty: callers exit before this when the binary
+# could not report one.
 verify_binary_integrity() {
     verify_claude_bin="$1"
     verify_version="$2"
     verify_strict="${3:-false}"  # "true" for specific-version installs
-
-    # Defense in depth: an empty version would turn the manifest URL into one
-    # with an empty path segment, and a non-strict caller would then skip the
-    # check on a 404 and treat the binary as verified
-    if [ -z "${verify_version}" ]; then
-        echo "ERROR: No version to verify ${verify_claude_bin} against" >&2
-        return 2
-    fi
 
     case "$(uname -m)" in
         x86_64)  verify_arch="x64" ;;
@@ -171,21 +164,7 @@ if ! id "${REMOTE_USER}" >/dev/null 2>&1; then
     fi
 fi
 
-# Resolve the home directory for the final REMOTE_USER.
-# _REMOTE_USER_HOME corresponds to _REMOTE_USER, which may differ from
-# REMOTE_USER after the _CONTAINER_USER fallback above. Use _REMOTE_USER_HOME
-# only when REMOTE_USER still matches _REMOTE_USER; otherwise resolve it
-# from the system so version detection and installation target the correct path.
-if [ -n "${_REMOTE_USER_HOME:-}" ] && [ "${REMOTE_USER}" = "${_REMOTE_USER:-}" ]; then
-    REMOTE_USER_HOME="${_REMOTE_USER_HOME}"
-elif [ "${REMOTE_USER}" = "root" ]; then
-    REMOTE_USER_HOME="/root"
-else
-    REMOTE_USER_HOME="$(getent passwd "${REMOTE_USER}" | cut -d: -f6 2>/dev/null)" || REMOTE_USER_HOME=""
-    if [ -z "${REMOTE_USER_HOME}" ]; then
-        REMOTE_USER_HOME="/home/${REMOTE_USER}"
-    fi
-fi
+REMOTE_USER_HOME="$(getent passwd "${REMOTE_USER}" | cut -d: -f6)"
 CLAUDE_BIN="${REMOTE_USER_HOME}/.local/bin/claude"
 
 if ! command -v curl > /dev/null 2>&1; then
@@ -245,8 +224,8 @@ fi
 
 if [ -x "${CLAUDE_BIN}" ]; then
     # Verify binary integrity against release manifest
-    # Hard-fail integrity check for pinned versions; soft-fail for channels
-    # Users can force strict checks for channels via requireIntegrityCheck
+    # A checksum mismatch always fails. When the check cannot be performed,
+    # pinned versions and requireIntegrityCheck fail; channels only warn.
     STRICT_INTEGRITY="false"
     if [ "${FEATURE_VERSION}" != "latest" ] && [ "${FEATURE_VERSION}" != "stable" ]; then
         STRICT_INTEGRITY="true"

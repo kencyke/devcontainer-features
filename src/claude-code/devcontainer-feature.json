@@ -14,7 +14,7 @@
         "requireIntegrityCheck": {
             "type": "boolean",
             "default": false,
-            "description": "When true, fail the installation if the binary integrity check cannot be performed (e.g. manifest download failure). By default, latest/stable installs only warn on verification failure."
+            "description": "When true, fail the installation if the binary integrity check cannot be performed (e.g. manifest download failure). By default, latest/stable installs only warn when the integrity check cannot be performed."
         },
         "forceReinstall": {
             "type": "boolean",

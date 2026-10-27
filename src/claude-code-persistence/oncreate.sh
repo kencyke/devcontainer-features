@@ -70,18 +70,12 @@ fi
 TARGET_UID="$(id -u)"
 TARGET_GID="$(id -g)"
 if [ "$(stat -c '%u:%g' "${VOLUME_DIR}")" != "${TARGET_UID}:${TARGET_GID}" ]; then
-    if [ "${TARGET_UID}" -eq 0 ]; then
-        AS_ROOT=""
-    elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-        AS_ROOT="sudo -n"
-    else
-        warn "${VOLUME_DIR} is owned by $(stat -c '%u:%g' "${VOLUME_DIR}"), not by $(id -un) (${TARGET_UID}:${TARGET_GID}), and passwordless sudo is unavailable. Claude Code will not be able to read or write its state until you run: sudo chown -R -h ${TARGET_UID}:${TARGET_GID} ${VOLUME_DIR}"
-        exit 0
-    fi
+    AS_ROOT="sudo -n"
+    [ "${TARGET_UID}" -eq 0 ] && AS_ROOT=""
     # -h: change symlinks in the volume themselves, never the files they point
     # to, regardless of the chown implementation (GNU or uutils)
     if ! ${AS_ROOT} chown -R -h "${TARGET_UID}:${TARGET_GID}" "${VOLUME_DIR}"; then
-        warn "Failed to change the owner of ${VOLUME_DIR}. Claude Code will not be able to read or write its state."
+        warn "Could not take over ${VOLUME_DIR}. Claude Code will not be able to read or write its state until you run as root: chown -R -h ${TARGET_UID}:${TARGET_GID} ${VOLUME_DIR}"
         exit 0
     fi
 fi
@@ -89,8 +83,7 @@ chmod 700 "${VOLUME_DIR}" 2>/dev/null || true
 
 # Paths are compared against /proc/self/mountinfo, which lists canonical
 # paths, so resolve symlinks and drop duplicate or trailing slashes first.
-HOME="${HOME:-$(getent passwd "$(id -un)" | cut -d: -f6)}"
-HOME="$(realpath -m "${HOME}" 2>/dev/null || echo "${HOME%/}")"
+HOME="$(realpath -m "${HOME}")"
 
 # --- ~/.claude ---------------------------------------------------------------
 # Claude Code itself follows CLAUDE_CONFIG_DIR; the symlink is for tools that
