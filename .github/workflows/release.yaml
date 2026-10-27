@@ -6,8 +6,12 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yaml
+
   deploy:
     if: ${{ github.ref == 'refs/heads/main' }}
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write

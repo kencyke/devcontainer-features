@@ -2,6 +2,7 @@ name: "CI - Test Features"
 on:
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
